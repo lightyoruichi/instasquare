@@ -1,0 +1,215 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8"/>
+    <title>Instasquare</title>
+    <style>
+      h1, h2 {}
+      h2 {margin: 0}
+      #map {width: 50%; height: 300px}
+      .container {
+        clear: both;
+        overflow: hidden;
+      }
+      .container > * {
+        float: left;
+        width: 50%;
+      }
+      ul {
+        list-style: none;
+        margin: 0; padding: 0;
+      }
+      ul li {
+        float: left;
+        margin-right: 10px;
+        width: 25%;
+      }
+      ul li a {font-size: 12px;}
+    </style>
+  </head>
+  <body>
+    <h1>Instasquare</h1>
+    <p>Show you instagrams from foursquare locations</p>
+    <form action="#">
+      <input type="text" name="query" id="query" />
+      <input type="text" name="category-id" id="category-id" value="4bf58dd8d48988d1c4941735" />
+      <input type="text" name="ll" id="ll" value="59.33382099089938,18.0808716894104" />
+      <input type="range" name="radius" id="radius" min="50" max="10000" step="50" value="500" />
+      <button type="submit">Sök</button>
+    </form>
+    
+    <div class="container">
+      <div id="map"></div>
+      <div>
+        <h2>Places nearby</h2>
+        <ul id="venue-picker"></ul>
+      </div>
+    </div>
+    
+    <h2 id="venue-name"></h2>
+    <h3 id="no-images"></h3>
+    <div id="images"></div>
+
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js"></script>
+    <script type="text/javascript" src="http://maps.googleapis.com/maps/api/js?sensor=true"></script>
+    <script type="text/javascript" src="js/instasquare.js"></script>
+    <script>
+    var settings = {
+      oath_token: "5X5SIN4V3KMWIOUYBTXW1HY4BFKF52XXTRPKLHST3GLP33ZO", // oath for foursquare
+      instagram_client_id: "37316ec7d4404893b1bfe688b6e5fa3f" // client id for instagram
+      // radius: Number($("#radius").val())
+    };
+    
+    // on form submit
+    $("form").submit(function(e) {
+      e.preventDefault();
+      var options = {
+        // get the query and ll from the form
+        query: $("#query").val(),
+        ll: $("#ll").val(),
+        // get the auth vars from settings
+        oath_token: settings.oath_token,
+        instagram_client_id: settings.instagram_client_id
+      };
+      
+      $("#no-images").html("");
+      $("#images").html("");
+      // get photos! and add them to the DOM
+      get_instagram_photos(options, function(images) {
+        console.log(images);
+        if (!images) {
+          $("#no-images").html("Sorry, there's no instagrams for this location!");
+          return;
+        }
+        $.each(images, function() {
+          $("#images").append('<img src="'+this.images.low_resolution.url+'" />')
+        });
+      });
+      
+    });
+    
+    var rc_to;
+    $("#radius").change(function(e) {
+      console.log("change!");
+      // $("form").trigger("submit");
+      circle.setRadius(Number($(this).val()))
+      
+      clearTimeout(rc_to);
+      rc_to = setTimeout(function() {
+        $("#venue-picker").html("");
+        do_search($("#ll").val().split(",")[0], $("#ll").val().split(",")[1]);
+      }, 250);
+      
+    });
+    
+    var map, 
+        geocoder,
+        marker,
+        circle,
+        pos = new google.maps.LatLng(59.33382099089938,18.0808716894104);
+    
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(function(position) {
+        console.log("navigator!");
+        // create latlng obj from geolocation positions
+        pos = new google.maps.LatLng(position.coords.latitude, position.coords.longitude);
+        // console.log(position.coords);
+        $("#ll").val(position.coords.latitude + "," + position.coords.longitude);
+        render_map();
+        
+        do_search(position.coords.latitude, position.coords.longitude);
+        
+      }, function() {
+        // user says no geolocation
+        
+        // do_search();
+        
+      });
+    }
+
+    function render_map() {
+
+      // init geocoder obj
+      geocoder = new google.maps.Geocoder();
+      
+      // create map
+      map = new google.maps.Map(document.getElementById('map'), {zoom: 12, mapTypeId: google.maps.MapTypeId.ROADMAP});
+      
+
+      
+      // create marker
+      marker = new google.maps.Marker({
+        position: pos, 
+        map: map,
+        title: "Dra mig!",
+        draggable: true
+      });
+      
+      // Add circle overlay and bind to marker
+      create_circle();
+      
+      // get the position when marker is dropped
+      google.maps.event.addListener(marker, 'dragend', function() {
+        $("#venue-picker").html("");
+        var latlng = marker.getPosition();
+
+        // add latlng to input field
+        $("#ll").val(latlng.lat() + "," + latlng.lng());
+
+        // get the address!
+        geocoder.geocode({'latLng': latlng}, function(results, status) {
+          if (status == google.maps.GeocoderStatus.OK) {
+
+            // parse the address
+            var full_adr = results[0].formatted_address,
+              adr_array = full_adr.split(","),
+              street = adr_array[0],
+              city = adr_array[1].split(" ")[3],
+              postal_code = adr_array[1].split(" ")[1] + " " + adr_array[1].split(" ")[2];
+
+            do_search(latlng.lat(), latlng.lng());
+
+          }
+        });
+
+      });
+      
+      // set the marker in center!
+      map.setCenter(pos);
+      
+    }
+    
+    function create_circle() {
+      circle = new google.maps.Circle({
+        map: map,
+        radius: Number($("#radius").val()),    
+        fillColor: '#00AA00',
+        strokeWeight: 2,
+        strokeOpacity: 0.5
+      });
+      circle.bindTo('center', marker, 'position');
+    }
+    
+
+    /*,4bf58dd8d48988d128941735,4bf58dd8d48988d16d941735*/
+    function do_search(lat, lng) {
+      search_foursquare_venues({ll: lat+","+lng, oath_token: settings.oath_token, categoryId: $("#category-id").val(), radius: Number($("#radius").val()), limit: 50, intent: "browse"}, function(data) {
+        console.log(data.response.venues.length);
+        $.each(data.response.venues, function() {
+          console.log(this);
+          var el = $('<li><a href="#'+this.id+'" data-id="'+this.id+'" data-name="'+this.name+'">'+this.name+'</a></li>').appendTo($("#venue-picker"));
+          $("a", el).click(function(e) {
+            e.preventDefault();
+            $("#query").val($(this).data("id"));
+            $("#venue-name").html('<a href="https://foursquare.com/v/'+$(this).data("name").toLowerCase()+'/'+$(this).data("id")+'">'+$(this).data("name")+'</a>');
+            // $("#venue-picker").html("");
+            $("form").trigger("submit");
+          })
+        });
+      });
+    }
+    
+
+    </script>
+  </body>
+</html>
