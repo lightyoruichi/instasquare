@@ -65,7 +65,7 @@
       e.preventDefault();
       var options = {
         // get the query and ll from the form
-        query: $("#query").val(),
+        location_id: $("#query").val(),
         ll: $("#ll").val(),
         // get the auth vars from settings
         oath_token: settings.oath_token,
@@ -75,7 +75,7 @@
       $("#no-images").html("");
       $("#images").html("");
       // get photos! and add them to the DOM
-      get_instagram_photos(options, function(images) {
+      Instasquare.get_instagram_photos(options, function(images) {
         console.log(images);
         if (!images) {
           $("#no-images").html("Sorry, there's no instagrams for this location!");
@@ -193,7 +193,7 @@
 
     /*,4bf58dd8d48988d128941735,4bf58dd8d48988d16d941735*/
     function do_search(lat, lng) {
-      search_foursquare_venues({ll: lat+","+lng, oath_token: settings.oath_token, categoryId: $("#category-id").val(), radius: Number($("#radius").val()), limit: 50, intent: "browse"}, function(data) {
+      Instasquare.search_foursquare_venues({ll: lat+","+lng, oath_token: settings.oath_token, categoryId: $("#category-id").val(), radius: Number($("#radius").val()), limit: 50, intent: "browse"}, function(data) {
         console.log(data.response.venues.length);
         $.each(data.response.venues, function() {
           console.log(this);
